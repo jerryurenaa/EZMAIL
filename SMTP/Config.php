@@ -22,9 +22,9 @@
             /**
              * Email server configuration
              */
-            "SMTP_HOST"  => "smtp.office365.com",
-            "SMTP_USERNAME" => "info@opinanow.com",
-            "SMTP_PORT" => 587,  
-            "SMTP_PASSWORD" => "Vegeta10131990@@@#$"
+            "SMTP_HOST"  => "",
+            "SMTP_USERNAME" => "",
+            "SMTP_PORT" => 123,  
+            "SMTP_PASSWORD" => ""
         ];
     }
