@@ -33,7 +33,7 @@ Configure the config file with your Mail server.
 2- Port 25 || 2525 support. not secure and many email clients are not supporting it either.
 
 
-#Example of a success transaction
+##Example of a success transaction
 
 250 SERVERURL Hello [IPV6]\
 220 2.0.0 SMTP server ready\
