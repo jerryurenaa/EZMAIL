@@ -25,7 +25,7 @@ Configure the config file with your Mail server.
 
 1-PIPELINE implementation\
 2-Basic HTML Email template integration\
-3-Auth using Token\
+3-Auth using Token
 
 ## What will not be implemented!
 
@@ -44,6 +44,6 @@ Configure the config file with your Mail server.
 250 2.1.0 Sender OK\
 250 2.1.5 Recipient OK\
 354 Start mail input; end with .\
-250 2.0.0 OK \
+250 2.0.0 OK 
 
 Email sent successfully
