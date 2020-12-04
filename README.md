@@ -8,7 +8,7 @@ report bugs or request implementation within this reponsitory.
 
 Configure the config file with your Mail server.
 
-##Further Documentation
+## Further Documentation
 
 [Link to RFC0821](https://www.ietf.org/rfc/rfc0821.txt)
 
