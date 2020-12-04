@@ -30,7 +30,7 @@ Configure the config file with your Mail server.
 ## What will not be implemented!
 
 1-SSL support. It has been replaced with the TLS protocol.\
-2- Port 25 || 2525 support. not secure and many email clients are not supporting it either.\
+2- Port 25 || 2525 support. not secure and many email clients are not supporting it either.
 
 
 #Example of a success transaction
