@@ -1,6 +1,7 @@
 <?php
     namespace EZMAIL;   
     use SMTP\Smtp;
+    use SMTP\Mail;
 
     /**
     * @copyright (c) Nerdtrix LLC 2020
@@ -27,6 +28,10 @@
     });
 
     
+    /**
+     * Example using SMTP Protocol
+     */
+
     #Create a new instance
     $smtp = new Smtp();
     
@@ -40,9 +45,36 @@
     #$smtp->attachment = ["name", "File URL"];
 
     #Add To email
-    $smtp->to = ["Your name" => "jerryurenaa@gmail.com"]; 
+    $smtp->to = ["Your name" => "myemail@example.com"];  
 
     #Send Email
     $confirm = $smtp->send();
 
     print_r($confirm);
+
+
+    /**
+     * Example using the Default php mail Protocol
+     */
+    
+    /*
+    #Create a new instance
+    $mail = new Mail();
+    
+    #Add email subject
+    $mail->subject = "test Email";
+
+    #Add email body
+    $mail->body = "<p>This is a sample email</p>";
+
+    #Add attachment
+    #$smtp->attachment = ["name", "File URL"];
+
+    #Add To email
+    $mail->to = ["Your name" => "myemail@example.com"]; 
+
+    #Send Email
+    $confirm = $mail->send();
+
+    print_r($confirm);
+    */

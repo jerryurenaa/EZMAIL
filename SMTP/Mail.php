@@ -1,5 +1,5 @@
 <?php
-    namespace SMTP; 
+    namespace SMTP;
     use SMTP\Config;
     use \Exception;
 
@@ -14,7 +14,7 @@
     */
 
 
-    class Smtp
+    class Mail
     {
         public 
             $subject, #email subject
@@ -25,90 +25,31 @@
             $attachment = [], #[Name => file path] : optional  
             $cc = [], #empty by default
             $bcc = []; #empty by default
-
-        #Helper strings
-        private $smtp, $data = null;       
+ 
         
         #Config instance
-        private $config;
+        private 
+            $config, #SMTP configuration
+            $boundary, #Email Baundary separator
+            $header, #Header string
+            $bodyContent; #Body string
 
 
         #Constructor
         public function __construct()
         {
+            if (!function_exists("mail"))
+            {
+               die("Please enable or install php mail");
+            }
+
             #Initialize config
             $this->config = new Config();
-
-            #Initialize SMTP connection.
-            $this->connect();
         }
 
-        #Destructor
         public function __destruct()
         {
-          #Disconnect
-          fclose($this->smtp);
-        }
-        
-        
-        /**
-         * @method Connect
-         * This is the handshake process
-         */
-        private function connect()
-        {
-            try
-            {
-                #Connection
-                $connection = fsockopen(
-                    $this->config->get["SMTP_HOST"], 
-                    $this->config->get["SMTP_PORT"], 
-                    $errno, 
-                    $errstr, 
-                    $this->config->get["CONNECTION_TIMEOUT"]
-                );
-
-                if(empty($connection))
-                {
-                    throw new Exception("$errstr ($errno)");
-                }
-
-                #Connection response
-                $response = fgets($connection, 512); 
-
-                $responseCode = (int) substr($response, 0, 3);
-
-                #Validate response
-                if($responseCode !== 220)
-                {
-                    throw new Exception($response);
-                }
-
-                $this->smtp = $connection;
-                
-                #Handshake
-                $this->sendCommand("HELO", 250);
-            
-                #secure
-                $this->sendCommand("STARTTLS", 220);
-
-                if(!stream_socket_enable_crypto($connection, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT)) 
-                {
-                    throw new Exception("Failed to start TLS");
-                }
-
-                #Encrypted Handshake
-                $this->sendCommand("HELO", 250);
-                
-                #Auth login using username and password
-                $this->sendCommand("AUTH LOGIN", 334);
-                $this->sendCommand(base64_encode($this->config->get["SMTP_USERNAME"]), 334);
-                $this->sendCommand(base64_encode($this->config->get["SMTP_PASSWORD"]), 235);
-            }
-            catch(Exception $ex)
-            {
-                throw new Exception($ex);
-            }
+            $this->config = null;
         }
 
 
@@ -126,31 +67,25 @@
             {
                 return "subject, body and to strings are requried to send an email";
             }
+            
+            $this->createHeader(); #Build mail header string
+            $this->createBody();    #Build mail body string
 
-            $this->sendCommand(sprintf("MAIL FROM: <%s>", $this->config->get["SMTP_USERNAME"]), 250);
-
-            foreach($this->to as $name => $email)
+            if(mail(end($this->to), $this->subject, $this->bodyContent, $this->header))
             {
-                $this->sendCommand("RCPT TO: <{$email}>", 250);
+                return "Email sent successfully";
             }
 
-            $this->sendCommand("DATA", 354);
-    
-            #Create mail string
-            $this->createData();
-
-            $this->sendCommand($this->data, 250);
-
-            return "Email sent successfully";
+            return "Unable to send mail";
         }
 
 
         /**
-         * @method createData
+         * @method createHeader
          * STOP :: WARNING :: before modifying this file 
          * you must read and understant how mime works.
          */
-        private function createData()
+        private function createHeader()
         {
             #Email header
             $this->addString(["MIME-Version" => "1.0"]);
@@ -219,9 +154,9 @@
             }
 
             #Remove the last comma
-            $bccstring = rtrim($bccstring, ",");
+            $ccString = rtrim($ccString, ",");
 
-            $this->addString(["Bcc" => $bccstring]);
+            $this->addString(["Bcc" => $ccString]);
 
 
             #Reply to
@@ -233,18 +168,25 @@
             $this->addString(["Reply-To" => $this->replyTo]);
 
             
-            $boundary = md5(uniqid(rand(), true));
+            $this->boundary = md5(uniqid(rand(), true));
 
             $multiPart = !$this->attachment ? "alternative" : "mixed";
 
-            $this->addString(["Content-Type" => "multipart/{$multiPart}; boundary=\"{$boundary}\""]); 
+            $this->addString(["Content-Type" => "multipart/{$multiPart}; boundary=\"{$this->boundary}\""]); 
+        }
 
-            
+
+        /**
+         * @method createBody
+         * Body email content.
+         */
+        private function createBody()
+        {
             #html content
-            $this->addString("--{$boundary}");
-            $this->addString(["Content-Type" => "text/html; charset=\"UTF-8\""]);
-            $this->addString(["Content-Transfer-Encoding" => "base64"], 2); #Two line breaks
-            $this->addString(chunk_split(base64_encode($this->body)));
+            $this->addString("--{$this->boundary}", "bodyContent");
+            $this->addString(["Content-Type" => "text/html; charset=\"UTF-8\""], "bodyContent");
+            $this->addString(["Content-Transfer-Encoding" => "base64"], "bodyContent", 2); #Two line breaks
+            $this->addString(chunk_split(base64_encode($this->body)), "bodyContent");
 
             #Attachments
             if(!empty($this->attachment))
@@ -254,23 +196,20 @@
                     #Add file extension to the name
                     $name = sprintf("%s.%s", $name, pathinfo($path, PATHINFO_EXTENSION));
 
-                    $this->addString("--{$boundary}");
-                    $this->addString(["Content-Type" => "application/octet-stream; name=\"{$name}\""]);
-                    $this->addString(["Content-Transfer-Encoding" => "base64"]);
-                    $this->addString(["Content-Disposition" => "attachment; filename=\"{$name}\""], 2);
-                    $this->addString(chunk_split(base64_encode(file_get_contents($path)))); 
+                    $this->addString("--{$this->boundary}", "bodyContent");
+                    $this->addString(["Content-Type" => "application/octet-stream; name=\"{$name}\""], "bodyContent");
+                    $this->addString(["Content-Transfer-Encoding" => "base64"], "bodyContent");
+                    $this->addString(["Content-Disposition" => "attachment; filename=\"{$name}\""], "bodyContent", 2);
+                    $this->addString(chunk_split(base64_encode(file_get_contents($path))), "bodyContent"); 
                 }
             }
 
             #End alternative
-            $this->addString("--{$boundary}--");
-
-            #End content
-            $this->addString(".");
+            $this->addString("--{$this->boundary}--", "bodyContent");
         }
 
 
-        /**
+         /**
          * @method encodeString
          * @param string 
          * @return string
@@ -284,11 +223,12 @@
         /**
          * @method addString 
          * @param string | array content
-         * @param int breakNumber
+         * @param string type (header or body)
+         * @param int breakNumber (number of line breaks max 2)
          * @param boolean encoded
-         * Appends to data
+         * Appends to requested type
          */
-        private function addString($content, $breakNumber = 1, $encoded = false)
+        private function addString($content, $type = "header", $breakNumber = 1, $encoded = false)
         {
             #determine line breaks
             $lineBreak = $breakNumber == 1 ? PHP_EOL : PHP_EOL . PHP_EOL;
@@ -296,7 +236,7 @@
             #Content is not an array
             if(!is_array($content))
             {
-                $this->data .= sprintf("%s%s", $content, $lineBreak);
+                $this->{$type} .= sprintf("%s%s", $content, $lineBreak);
 
                 return;
             }
@@ -304,47 +244,12 @@
             #Content is encoded
             if($encoded)
             {
-                $this->data .= sprintf("%s: =?utf-8?B?%s?=%s", key($content), base64_encode(end($content)), $lineBreak);
+                $this->{$type} .= sprintf("%s: =?utf-8?B?%s?=%s", key($content), base64_encode(end($content)), $lineBreak);
 
                 return;
             }
             
             #Default
-            $this->data .= sprintf("%s: %s%s", key($content), end($content), $lineBreak);
-        }
-
-
-        /**
-         * @method sendCommand
-         * @param string command
-         * @param int validCode
-         * @return boolean
-         * @throws exceptions
-         * @print to console on debug mode
-         */
-        private function sendCommand($command, $validCode)
-        {
-            #Send Command with line breaks
-            fputs($this->smtp, $command . PHP_EOL);
-
-            #Read response string
-            $response = fgets($this->smtp, 512); 
-
-            #Response code
-            $responseCode = substr(trim($response), 0, 3);
-
-            #Validate response
-            if($responseCode != (string)$validCode)
-            {
-                throw new Exception($response);
-            }
-
-            #Print transaction to the screen
-            if($this->config->get["CONSOLE_LOG"])
-            {
-                print_r($response . "<pre>"); //Print with linebreak
-            }
-            
-            return true;
+            $this->{$type} .= sprintf("%s: %s%s", key($content), end($content), $lineBreak);
         }
     }
